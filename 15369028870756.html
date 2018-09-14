@@ -4,7 +4,7 @@
 	<meta charset="utf-8">
 	<title>  
 	  
-  	Archives - 
+  	Spring Boot 集成 redis - 
   	
 	</title>
 
@@ -122,65 +122,110 @@
 		</div>	
 		<div class="mid-col">
 			<div class="mid-col-container"> <div id="content" class="inner">
-	<div itemscope itemtype="http://schema.org/Blog">
-		<section class="archives">
 
-		
-			 
-			  	<h1 style="top: auto;" class="year">2018</h1>
-			
-			
+	<article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+		<h1 class="title" itemprop="name">Spring Boot 集成 redis</h1>
+		<div class="entry-content" itemprop="articleBody">
+			<p>早些时候<strong>Spring MVC</strong> 里面用 redis 都是用的 <code>redis.clients.jedis</code>，后面因为看到<strong>Spring Boot</strong> 减少大量配置，然后基本都会优先选择<strong>Spring Boot</strong>。</p>
 
-				<article itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
-					<div class="meta">
-						<span class="date"><time datetime="2018-09-14T13:28:07+08:00" itemprop="datePublished">9月 14</time></span>
-						<br>
-						 
-						
-						 
-						
-					    
-					</div>
-					<h1 class="title" itemprop="name"><a href="15369028870756.html">
-					Spring Boot 集成 redis</a></h1>
-				</article>
-	 	
-			
-			
+<p>看文档发现 Spring Boot 集成大量内容，基本拿来就用吧。<a href="https://docs.spring.io/spring-boot/docs/2.0.3.RELEASE/reference/htmlsingle/">文档</a> </p>
 
-				<article itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
-					<div class="meta">
-						<span class="date"><time datetime="2018-09-13T23:43:03+08:00" itemprop="datePublished">9月 13</time></span>
-						<br>
-						 
-						
-						 
-						
-					    
-					</div>
-					<h1 class="title" itemprop="name"><a href="15368533832283.html">
-					Alfred</a></h1>
-				</article>
-	 	
-			
-			
+<p>Spring boot 集成 Redis 大概流程</p>
 
-				<article itemprop="blogPost" itemscope itemtype="http://schema.org/BlogPosting">
-					<div class="meta">
-						<span class="date"><time datetime="2018-09-13T22:32:13+08:00" itemprop="datePublished">9月 13</time></span>
-						<br>
-						 
-						
-						 
-						
-					    
-					</div>
-					<h1 class="title" itemprop="name"><a href="15368491336351.html">
-					Mweb</a></h1>
-				</article>
-	 	
+<span id="more"></span><!-- more -->
 
-	  </section>
+<h2 id="toc_0">添加依赖</h2>
+
+<pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+    &lt;version&gt;1.5.0.RELEASE&lt;/version&gt;
+&lt;/dependency&gt;
+</code></pre>
+
+<h2 id="toc_1">Redis 相关配置</h2>
+
+<pre><code># Redis数据库索引（默认为0）,如果设置为1，那么存入的key-value都存放在select 1中
+spring.redis.database=n
+# Redis服务器地址
+spring.redis.host=localhost
+# Redis服务器连接端口
+spring.redis.port=6379 
+# Redis服务器连接密码（默认为空）
+spring.redis.password=xxx
+#连接池最大连接数（使用负值表示没有限制）
+spring.redis.pool.max-active=8 
+# 连接池最大阻塞等待时间（使用负值表示没有限制）
+spring.redis.pool.max-wait=-1 
+# 连接池中的最大空闲连接
+spring.redis.pool.max-idle=8 
+# 连接池中的最小空闲连接
+spring.redis.pool.min-idle=0 
+# 连接超时时间（毫秒）
+spring.redis.timeout=0
+</code></pre>
+
+<h2 id="toc_2">配置redisTemplate</h2>
+
+<pre><code>@Configuration
+@EnableAutoConfiguration
+public class RedisCacheConfig extends CachingConfigurerSupport {
+
+    @Autowired
+    private JedisConnectionFactory jedisConnectionFactory;
+
+    @Bean
+    public RedisTemplate&lt;String, Object&gt; redisTemplate(){
+        RedisTemplate&lt;String, Object&gt; redisTemplate = new RedisTemplate&lt;&gt;();
+        initDomainRedisTemplate(redisTemplate, jedisConnectionFactory);
+        return redisTemplate;
+    }
+
+    @Bean
+    public HashOperations&lt;String, String, Object&gt; hashOperations(RedisTemplate&lt;String, Object&gt; redisTemplate) {
+        return redisTemplate.opsForHash();
+    }
+
+    @Bean
+    public ValueOperations&lt;String, Object&gt; valueOperations(RedisTemplate&lt;String, Object&gt; redisTemplate) {
+        return redisTemplate.opsForValue();
+    }  
+}   
+</code></pre>
+
+<h2 id="toc_3">序列化问题</h2>
+
+<pre><code>private void initDomainRedisTemplate(RedisTemplate&lt;String, Object&gt; redisTemplate, RedisConnectionFactory factory) {
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+        Jackson2JsonRedisSerializer jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer(Object.class);
+        ObjectMapper om = new ObjectMapper();
+        om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+        om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+        jackson2JsonRedisSerializer.setObjectMapper(om);
+        redisTemplate.setHashValueSerializer(jackson2JsonRedisSerializer);
+        redisTemplate.setValueSerializer(jackson2JsonRedisSerializer);
+        redisTemplate.setConnectionFactory(factory);
+    }
+</code></pre>
+
+<h2 id="toc_4">其它操作</h2>
+
+<p>其它操作就很简单了，如 <code>valueOperations.set(key, obj);</code></p>
+
+<h2 id="toc_5">注意</h2>
+
+<p><code>valueOperations.set(key, obj, long l)</code> 这个方法不是设置失效时间~~</p>
+
+		</div>
+	</article>
+	<div class="share-comment">
+	 
+
+	  
+
+	  
+
 	</div>
 </div>        </div>
 			<footer id="footer" class="inner">Copyright &copy; 2014
