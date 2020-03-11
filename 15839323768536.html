@@ -128,7 +128,40 @@
 		<div class="entry-content" itemprop="articleBody">
 			<p>懒得写，直接看代码</p>
 
+<span id="more"></span><!-- more -->
+
 <pre><code>
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
+
+public class Test {
+
+    public static void main(String[] args) {
+
+        List&lt;ObjectT&gt; list = Arrays.asList(
+                new ObjectT(1, &quot;this is 1&quot;),
+                new ObjectT(2, &quot;this is 2&quot;));
+
+        list.forEach(objectT -&gt; {
+            System.out.println(objectT.getName());
+        });
+
+        // list 转 map
+        Map&lt;Integer, ObjectT&gt; map = list.stream().collect(Collectors.toMap(ObjectT::getId, t -&gt; t));
+
+        // map 转 list
+        List&lt;String&gt; list2 = map.entrySet().stream().map(
+                e -&gt; e.getValue().getId() + &quot; &quot; + e.getValue().getName()).collect(toList());
+
+        list2.forEach(System.out::println);
+        map.forEach((k, v) -&gt; System.out.println(k));
+    }
+
+}
 </code></pre>
 
 		</div>
