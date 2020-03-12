@@ -151,7 +151,8 @@ public class Test {
         });
 
         // list 转 map
-        Map&lt;Integer, ObjectT&gt; map = list.stream().collect(Collectors.toMap(ObjectT::getId, t -&gt; t));
+        Map&lt;Integer, ObjectT&gt; map = list.stream().collect(
+            Collectors.toMap(ObjectT::getId, t -&gt; t));
 
         // map 转 list
         List&lt;String&gt; list2 = map.entrySet().stream().map(
