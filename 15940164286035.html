@@ -4,7 +4,7 @@
 	<meta charset="utf-8">
 	<title>  
 	  
-  	Stream Map List 相互转换 - 
+  	Spring boot 加载jar 包里面 class - 
   	
 	</title>
 
@@ -124,46 +124,93 @@
 			<div class="mid-col-container"> <div id="content" class="inner">
 
 	<article class="post" itemscope itemtype="http://schema.org/BlogPosting">
-		<h1 class="title" itemprop="name">Stream Map List 相互转换</h1>
+		<h1 class="title" itemprop="name">Spring boot 加载jar 包里面 class</h1>
 		<div class="entry-content" itemprop="articleBody">
-			<p>懒得写，直接看代码</p>
+			<p>代码如下  </p>
 
-<span id="more"></span><!-- more -->
+<span id="more"></span><!-- more -->   
 
-<pre><code>
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+<pre><code>import com.jj.red.packet.consumer.job.cache.JobCronCache;
+import com.jj.red.packet.consumer.job.conf.BaseTaskJob;
+import com.jj.red.packet.consumer.job.conf.QuartzJobManager;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.core.io.support.ResourcePatternResolver;
+import org.springframework.core.type.classreading.CachingMetadataReaderFactory;
+import org.springframework.core.type.classreading.MetadataReader;
+import org.springframework.core.type.classreading.MetadataReaderFactory;
+import org.springframework.stereotype.Component;
 
-import static java.util.stream.Collectors.toList;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
-public class Test {
+@Component
+@Order(value = 1)
+public class CronJobInit implements ApplicationRunner {
 
-    public static void main(String[] args) {
+    private final static Logger logger = Logger.getLogger(CronJobInit.class);
 
-        List&lt;ObjectT&gt; list = Arrays.asList(
-                new ObjectT(1, &quot;this is 1&quot;),
-                new ObjectT(2, &quot;this is 2&quot;));
+    private final static String TASK_PACKAGE = &quot;com.xx.xx.consumer.job.task&quot;;
 
-        list.forEach(objectT -&gt; {
-            System.out.println(objectT.getName());
-        });
+    @Autowired
+    private QuartzJobManager quartzJobManager;
 
-        // list 转 map
-        Map&lt;Integer, ObjectT&gt; map = list.stream().collect(
-            Collectors.toMap(ObjectT::getId, t -&gt; t));
+    @Autowired
+    private JobCronCache jobCronCache;
 
-        // map 转 list
-        List&lt;String&gt; list2 = map.entrySet().stream().map(
-                e -&gt; e.getValue().getId() + &quot; &quot; + 
-                e.getValue().getName()).collect(toList());
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        Set&lt;Class&lt;?&gt;&gt; classes = getClasses(TASK_PACKAGE);
+        if (CollectionUtils.isNotEmpty(classes)) {
+            for (Class c : classes) {
+                BaseTaskJob job = (BaseTaskJob) c.newInstance();
+                String cron = jobCronCache.getCron(job.getJobName(), job.getGroupName(), job.getCron());
+                quartzJobManager.addJob(c, job.getJobName(), job.getGroupName(), job.getDescription(), cron);
+            }
+        }
+    }
 
-        list2.forEach(System.out::println);
-        map.forEach((k, v) -&gt; System.out.println(k));
+
+    public static Set&lt;Class&lt;?&gt;&gt; getClasses(String packageName) throws IOException, ClassNotFoundException {
+        Set&lt;Class&lt;?&gt;&gt; classSet = new HashSet&lt;&gt;();
+        ResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        Resource[] resources = resolver.getResources(packageName.replace(&quot;.&quot;, &quot;/&quot;) + &quot;/*.class&quot;);
+        if (resources != null &amp;&amp; resources.length &gt; 0) {
+            MetadataReaderFactory metaReader = new CachingMetadataReaderFactory();
+            for (Resource resource : resources) {
+                MetadataReader reader = metaReader.getMetadataReader(resource);
+                String className = reader.getClassMetadata().getClassName();
+                doAddClass(classSet, className);
+            }
+        }
+
+        return classSet;
+    }
+
+    private static void doAddClass(Set&lt;Class&lt;?&gt;&gt; classSet, String className) {
+        Class&lt;?&gt; cls = loadClass(className, false);
+        classSet.add(cls);
+    }
+
+    public static Class&lt;?&gt; loadClass(String className, boolean isInitialized) {
+        Class&lt;?&gt; cls;
+        try {
+            cls = Class.forName(className, isInitialized, Thread.currentThread().getContextClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        return cls;
     }
 
 }
+
 </code></pre>
 
 		</div>
